@@ -21,15 +21,17 @@ import java.util.Map;
 import org.dswarm.graph.DMPGraphException;
 import org.dswarm.graph.GraphIndexStatics;
 import org.dswarm.graph.model.GraphStatics;
+
 import org.neo4j.helpers.collection.MapUtil;
 import org.neo4j.unsafe.batchinsert.BatchInserter;
 import org.neo4j.unsafe.batchinsert.BatchInserterIndex;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import com.carrotsearch.hppc.ObjectLongMap;
-import com.carrotsearch.hppc.ObjectLongOpenHashMap;
 import com.google.common.base.Optional;
+
+import it.unimi.dsi.fastutil.objects.Object2LongMap;
+import it.unimi.dsi.fastutil.objects.Object2LongOpenHashMap;
 
 /**
  * @author tgaengler
@@ -41,9 +43,9 @@ public class DataModelNeo4jProcessor extends Neo4jProcessor {
 	private BatchInserterIndex			statementUUIDsWDataModel;
 
 	// TODO: utilise temp index (if necessary)
-	private final ObjectLongMap<String>	tempStatementUUIDsWDataModelIndex;
+	private final Object2LongMap<String> tempStatementUUIDsWDataModelIndex;
 
-	private final String				dataModelURI;
+	private final String dataModelURI;
 
 	public DataModelNeo4jProcessor(final BatchInserter inserter, final String dataModelURIArg) throws DMPGraphException {
 
@@ -51,7 +53,7 @@ public class DataModelNeo4jProcessor extends Neo4jProcessor {
 
 		dataModelURI = dataModelURIArg;
 
-		tempStatementUUIDsWDataModelIndex = new ObjectLongOpenHashMap<>();
+		tempStatementUUIDsWDataModelIndex = new Object2LongOpenHashMap<>();
 
 		initStatementIndex();
 	}
@@ -68,7 +70,8 @@ public class DataModelNeo4jProcessor extends Neo4jProcessor {
 
 		try {
 
-			statementUUIDsWDataModel = getOrCreateIndex(GraphIndexStatics.STATEMENT_UUIDS_W_DATA_MODEL_INDEX_NAME, GraphStatics.UUID_W_DATA_MODEL, false, 1);
+			statementUUIDsWDataModel = getOrCreateIndex(GraphIndexStatics.STATEMENT_UUIDS_W_DATA_MODEL_INDEX_NAME, GraphStatics.UUID_W_DATA_MODEL,
+					false, 1);
 		} catch (final Exception e) {
 
 			final String message = "couldn't load indices successfully";

@@ -49,12 +49,13 @@ import org.neo4j.graphdb.index.IndexHits;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import com.carrotsearch.hppc.LongObjectMap;
-import com.carrotsearch.hppc.LongObjectOpenHashMap;
 import com.github.emboss.siphash.SipHash;
 import com.google.common.base.Charsets;
 import com.google.common.base.Optional;
 import com.google.common.collect.Maps;
+
+import it.unimi.dsi.fastutil.longs.Long2ObjectMap;
+import it.unimi.dsi.fastutil.longs.Long2ObjectOpenHashMap;
 
 /**
  * @author tgaengler
@@ -73,7 +74,7 @@ public abstract class Neo4jProcessor {
 	protected final Map<String, Node>		bnodes;
 	// protected Index<Relationship> statementHashes;
 	protected ChronicleMap<Long, Long>		statementHashes;
-	protected final LongObjectMap<String>	nodeResourceMap;
+	protected final Long2ObjectMap<String>	nodeResourceMap;
 
 	private Map<String, Node>				tempResourcesIndex;
 	private Map<String, Node>				tempResourcesWDataModelIndex;
@@ -91,7 +92,7 @@ public abstract class Neo4jProcessor {
 		LOG.debug("start write TX");
 
 		bnodes = new HashMap<>();
-		nodeResourceMap = new LongObjectOpenHashMap<>();
+		nodeResourceMap = new Long2ObjectOpenHashMap<>();
 	}
 
 	protected void initIndices() throws DMPGraphException {
@@ -141,7 +142,7 @@ public abstract class Neo4jProcessor {
 		return statementHashes;
 	}
 
-	public LongObjectMap<String> getNodeResourceMap() {
+	public Long2ObjectMap<String> getNodeResourceMap() {
 
 		return nodeResourceMap;
 	}

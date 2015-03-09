@@ -21,15 +21,17 @@ import java.util.Map;
 import org.dswarm.graph.DMPGraphException;
 import org.dswarm.graph.GraphIndexStatics;
 import org.dswarm.graph.model.GraphStatics;
+
 import org.neo4j.helpers.collection.MapUtil;
 import org.neo4j.unsafe.batchinsert.BatchInserter;
 import org.neo4j.unsafe.batchinsert.BatchInserterIndex;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import com.carrotsearch.hppc.ObjectLongMap;
-import com.carrotsearch.hppc.ObjectLongOpenHashMap;
 import com.google.common.base.Optional;
+
+import it.unimi.dsi.fastutil.objects.Object2LongMap;
+import it.unimi.dsi.fastutil.objects.Object2LongOpenHashMap;
 
 /**
  * @author tgaengler
@@ -41,13 +43,13 @@ public class SimpleNeo4jProcessor extends Neo4jProcessor {
 	protected BatchInserterIndex		statementUUIDs;
 
 	// TODO: utilise temp index (if necessary)
-	private final ObjectLongMap<String>	tempStatementUUIDsIndex;
+	private final Object2LongMap<String> tempStatementUUIDsIndex;
 
 	public SimpleNeo4jProcessor(final BatchInserter inserter) throws DMPGraphException {
 
 		super(inserter);
 
-		tempStatementUUIDsIndex = new ObjectLongOpenHashMap<>();
+		tempStatementUUIDsIndex = new Object2LongOpenHashMap<>();
 
 		initStatementIndex();
 	}
@@ -95,7 +97,8 @@ public class SimpleNeo4jProcessor extends Neo4jProcessor {
 	}
 
 	@Override
-	public void handleSubjectDataModel(final Map<String, Object> subjectNodeProperties, final String URI, final Optional<String> optionalDataModelURI) {
+	public void handleSubjectDataModel(final Map<String, Object> subjectNodeProperties, final String URI,
+			final Optional<String> optionalDataModelURI) {
 
 		if (optionalDataModelURI.isPresent()) {
 
