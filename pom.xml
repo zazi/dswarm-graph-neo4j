@@ -98,7 +98,7 @@
 				<artifactId>maven-surefire-plugin</artifactId>
 				<version>${maven-surefire-plugin.version}</version>
 				<configuration>
-					<argLine>-server -d64 -Xms4G -Xmx4G -XX:NewRatio=5
+					<argLine>-server -d64 -Xms8G -Xmx8G -XX:NewRatio=5
 						-XX:+UseConcMarkSweepGC -XX:+UseParNewGC -XX:ParallelCMSThreads=4
 						-XX:+CMSParallelRemarkEnabled -XX:+CMSIncrementalMode
 						-XX:+CMSIncrementalPacing -XX:CMSIncrementalDutyCycle=10
@@ -350,10 +350,26 @@
 			<type>test-jar</type>
 			<version>${neo4j.version}</version>
 		</dependency>
-		<dependency>
+		<!-- <dependency>
 			<groupId>com.carrotsearch</groupId>
 			<artifactId>hppc</artifactId>
 			<version>${hppc.version}</version>
+		</dependency> -->
+		<!-- <dependency>
+			<groupId>it.unimi.dsi</groupId>
+			<artifactId>fastutil</artifactId>
+			<version>6.6.3</version>
+		</dependency> -->
+		<dependency>
+			<groupId>net.openhft</groupId>
+			<artifactId>koloboke-api-jdk6-7</artifactId>
+			<version>0.6.6</version>
+		</dependency>
+		<dependency>
+			<groupId>net.openhft</groupId>
+			<artifactId>koloboke-impl-jdk6-7</artifactId>
+			<version>0.6.6</version>
+			<scope>runtime</scope>
 		</dependency>
 		<dependency>
 			<groupId>de.knutwalker</groupId>

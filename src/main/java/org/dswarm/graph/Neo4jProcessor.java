@@ -22,6 +22,14 @@
  * General Public License for more details. You should have received a copy of the GNU General Public License along with d:swarm
  * graph extension. If not, see <http://www.gnu.org/licenses/>.
  */
+/**
+ * This file is part of d:swarm graph extension. d:swarm graph extension is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by the Free Software Foundation, either version 3 of the
+ * License, or (at your option) any later version. d:swarm graph extension is distributed in the hope that it will be useful, but
+ * WITHOUT ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the GNU
+ * General Public License for more details. You should have received a copy of the GNU General Public License along with d:swarm
+ * graph extension. If not, see <http://www.gnu.org/licenses/>.
+ */
 package org.dswarm.graph;
 
 import java.io.File;
@@ -30,6 +38,8 @@ import java.util.HashMap;
 import java.util.Map;
 
 import net.openhft.chronicle.map.ChronicleMap;
+import net.openhft.koloboke.collect.map.hash.HashLongObjMap;
+import net.openhft.koloboke.collect.map.hash.HashLongObjMaps;
 
 import org.dswarm.graph.hash.HashUtils;
 import org.dswarm.graph.index.ChronicleMapUtils;
@@ -54,9 +64,6 @@ import com.google.common.base.Charsets;
 import com.google.common.base.Optional;
 import com.google.common.collect.Maps;
 
-import it.unimi.dsi.fastutil.longs.Long2ObjectMap;
-import it.unimi.dsi.fastutil.longs.Long2ObjectOpenHashMap;
-
 /**
  * @author tgaengler
  */
@@ -74,7 +81,7 @@ public abstract class Neo4jProcessor {
 	protected final Map<String, Node>		bnodes;
 	// protected Index<Relationship> statementHashes;
 	protected ChronicleMap<Long, Long>		statementHashes;
-	protected final Long2ObjectMap<String>	nodeResourceMap;
+	protected final HashLongObjMap<String>	nodeResourceMap;
 
 	private Map<String, Node>				tempResourcesIndex;
 	private Map<String, Node>				tempResourcesWDataModelIndex;
@@ -92,7 +99,7 @@ public abstract class Neo4jProcessor {
 		LOG.debug("start write TX");
 
 		bnodes = new HashMap<>();
-		nodeResourceMap = new Long2ObjectOpenHashMap<>();
+		nodeResourceMap = HashLongObjMaps.getDefaultFactory().newMutableMap();
 	}
 
 	protected void initIndices() throws DMPGraphException {
@@ -142,7 +149,7 @@ public abstract class Neo4jProcessor {
 		return statementHashes;
 	}
 
-	public Long2ObjectMap<String> getNodeResourceMap() {
+	public HashLongObjMap<String> getNodeResourceMap() {
 
 		return nodeResourceMap;
 	}

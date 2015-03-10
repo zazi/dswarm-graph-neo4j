@@ -22,6 +22,8 @@ import org.dswarm.graph.DMPGraphException;
 import org.dswarm.graph.GraphIndexStatics;
 import org.dswarm.graph.model.GraphStatics;
 
+import net.openhft.koloboke.collect.map.hash.HashObjLongMap;
+import net.openhft.koloboke.collect.map.hash.HashObjLongMaps;
 import org.neo4j.helpers.collection.MapUtil;
 import org.neo4j.unsafe.batchinsert.BatchInserter;
 import org.neo4j.unsafe.batchinsert.BatchInserterIndex;
@@ -30,8 +32,6 @@ import org.slf4j.LoggerFactory;
 
 import com.google.common.base.Optional;
 
-import it.unimi.dsi.fastutil.objects.Object2LongMap;
-import it.unimi.dsi.fastutil.objects.Object2LongOpenHashMap;
 
 /**
  * @author tgaengler
@@ -43,7 +43,7 @@ public class DataModelNeo4jProcessor extends Neo4jProcessor {
 	private BatchInserterIndex			statementUUIDsWDataModel;
 
 	// TODO: utilise temp index (if necessary)
-	private final Object2LongMap<String> tempStatementUUIDsWDataModelIndex;
+	private final HashObjLongMap<String> tempStatementUUIDsWDataModelIndex;
 
 	private final String dataModelURI;
 
@@ -53,7 +53,7 @@ public class DataModelNeo4jProcessor extends Neo4jProcessor {
 
 		dataModelURI = dataModelURIArg;
 
-		tempStatementUUIDsWDataModelIndex = new Object2LongOpenHashMap<>();
+		tempStatementUUIDsWDataModelIndex = HashObjLongMaps.getDefaultFactory().newMutableMap();
 
 		initStatementIndex();
 	}

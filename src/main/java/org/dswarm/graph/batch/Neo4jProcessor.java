@@ -30,6 +30,14 @@
  * General Public License for more details. You should have received a copy of the GNU General Public License along with d:swarm
  * graph extension. If not, see <http://www.gnu.org/licenses/>.
  */
+/**
+ * This file is part of d:swarm graph extension. d:swarm graph extension is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by the Free Software Foundation, either version 3 of the
+ * License, or (at your option) any later version. d:swarm graph extension is distributed in the hope that it will be useful, but
+ * WITHOUT ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the GNU
+ * General Public License for more details. You should have received a copy of the GNU General Public License along with d:swarm
+ * graph extension. If not, see <http://www.gnu.org/licenses/>.
+ */
 package org.dswarm.graph.batch;
 
 import java.io.File;
@@ -39,8 +47,15 @@ import java.util.HashMap;
 import java.util.Map;
 import java.util.Properties;
 
-import it.unimi.dsi.fastutil.Hash;
 import net.openhft.chronicle.map.ChronicleMap;
+import net.openhft.koloboke.collect.ObjCursor;
+import net.openhft.koloboke.collect.map.hash.HashLongLongMap;
+import net.openhft.koloboke.collect.map.hash.HashLongLongMaps;
+import net.openhft.koloboke.collect.map.hash.HashLongObjMap;
+import net.openhft.koloboke.collect.map.hash.HashLongObjMaps;
+import net.openhft.koloboke.collect.map.hash.HashObjLongMap;
+import net.openhft.koloboke.collect.map.hash.HashObjLongMaps;
+import net.openhft.koloboke.collect.set.hash.HashObjSet;
 
 import org.dswarm.graph.DMPGraphException;
 import org.dswarm.graph.GraphIndexStatics;
@@ -65,39 +80,32 @@ import com.google.common.base.Charsets;
 import com.google.common.base.Optional;
 import com.google.common.io.Resources;
 
-import it.unimi.dsi.fastutil.longs.Long2LongMap;
-import it.unimi.dsi.fastutil.longs.Long2LongOpenHashMap;
-import it.unimi.dsi.fastutil.longs.Long2ObjectOpenHashMap;
-import it.unimi.dsi.fastutil.objects.Object2LongMap;
-import it.unimi.dsi.fastutil.objects.Object2LongOpenHashMap;
-import it.unimi.dsi.fastutil.objects.ObjectIterator;
-
 /**
  * @author tgaengler
  */
 public abstract class Neo4jProcessor {
 
-	private static final Logger						LOG			= LoggerFactory.getLogger(Neo4jProcessor.class);
+	private static final Logger				LOG			= LoggerFactory.getLogger(Neo4jProcessor.class);
 
-	protected int									addedLabels	= 0;
+	protected int							addedLabels	= 0;
 
-	protected final BatchInserter					inserter;
-	private BatchInserterIndex						resources;
-	private BatchInserterIndex						resourcesWDataModel;
-	private BatchInserterIndex						resourceTypes;
+	protected final BatchInserter			inserter;
+	private BatchInserterIndex				resources;
+	private BatchInserterIndex				resourcesWDataModel;
+	private BatchInserterIndex				resourceTypes;
 
-	protected final Object2LongOpenHashMap<String>	tempResourcesIndex;
-	protected final Object2LongOpenHashMap<String>	tempResourcesWDataModelIndex;
-	protected final Object2LongOpenHashMap<String>	tempResourceTypes;
+	protected final HashObjLongMap<String>	tempResourcesIndex;
+	protected final HashObjLongMap<String>	tempResourcesWDataModelIndex;
+	protected final HashObjLongMap<String>	tempResourceTypes;
 
-	private BatchInserterIndex						values;
-	protected final Object2LongOpenHashMap<String>	bnodes;
+	private BatchInserterIndex				values;
+	protected final HashObjLongMap<String>	bnodes;
 	// private BatchInserterIndex statementHashes;
-	private ChronicleMap<Long, Long>				statementHashes;
+	private ChronicleMap<Long, Long>		statementHashes;
 
-	protected final Long2LongOpenHashMap			tempStatementHashes;
+	protected final HashLongLongMap			tempStatementHashes;
 
-	protected final Long2ObjectOpenHashMap<String>	nodeResourceMap;
+	protected final HashLongObjMap<String>	nodeResourceMap;
 
 	public Neo4jProcessor(final BatchInserter inserter) throws DMPGraphException {
 
@@ -105,15 +113,15 @@ public abstract class Neo4jProcessor {
 
 		Neo4jProcessor.LOG.debug("start writing");
 
-		bnodes = new Object2LongOpenHashMap<>();
-		nodeResourceMap = new Long2ObjectOpenHashMap<>();
+		bnodes = HashObjLongMaps.getDefaultFactory().newMutableMap();
+		nodeResourceMap = HashLongObjMaps.getDefaultFactory().newMutableMap();
 
-		tempResourcesIndex = new Object2LongOpenHashMap<>();
-		tempResourcesWDataModelIndex = new Object2LongOpenHashMap<>();
-		tempResourceTypes = new Object2LongOpenHashMap<>();
+		tempResourcesIndex = HashObjLongMaps.getDefaultFactory().newMutableMap();
+		tempResourcesWDataModelIndex = HashObjLongMaps.getDefaultFactory().newMutableMap();
+		tempResourceTypes = HashObjLongMaps.getDefaultFactory().newMutableMap();
 		// tempStatementHashes = new LongLongOpenHashMap();
 		// tempStatementHashes = ChronicleMapUtils.createOrGetLongIndex();
-		tempStatementHashes = new Long2LongOpenHashMap();
+		tempStatementHashes = HashLongLongMaps.getDefaultFactory().newMutableMap();
 
 		// TODO: init all indices, when batch inserter should work on a pre-filled database (otherwise, the existing index would
 		// utilised in the first run)
@@ -134,8 +142,8 @@ public abstract class Neo4jProcessor {
 		Neo4jProcessor.LOG.debug("finished pumping indices");
 	}
 
-	private void copyNFlushNClearIndex(final Object2LongOpenHashMap<String> tempIndex, final BatchInserterIndex neo4jIndex,
-			final String indexProperty, final String indexName) {
+	private void copyNFlushNClearIndex(final HashObjLongMap<String> tempIndex, final BatchInserterIndex neo4jIndex, final String indexProperty,
+			final String indexName) {
 
 		Neo4jProcessor.LOG.debug("start pumping '" + indexName + "' index of size '" + tempIndex.size() + "'");
 
@@ -152,18 +160,18 @@ public abstract class Neo4jProcessor {
 		int sinceLast = 0;
 
 		// for (int i = 0; i < states.length; i++) {
-		final Object2LongMap.FastEntrySet<String> entrySet = tempIndex.object2LongEntrySet();
-		final ObjectIterator<Object2LongMap.Entry<String>> iter = entrySet.fastIterator();
+		final HashObjSet<Map.Entry<String, Long>> entrySet = tempIndex.entrySet();
+		final ObjCursor<Map.Entry<String, Long>> iter = entrySet.cursor();
 
-		while (iter.hasNext()) {
+		while (iter.moveNext()) {
 
-			final Object2LongMap.Entry<String> entry = iter.next();
+			final Map.Entry<String, Long> entry = iter.elem();
 
 			// if (states[i]) {
 
 			// @tgaengler: I can't remember why I'm utilising an char array here ...
 			// neo4jIndex.add(values[i], MapUtil.map(indexProperty, keys[i].toString().toCharArray()));
-			neo4jIndex.add(entry.getLongValue(), MapUtil.map(indexProperty, entry.getKey().toCharArray()));
+			neo4jIndex.add(entry.getValue(), MapUtil.map(indexProperty, entry.getKey().toCharArray()));
 
 			j++;
 
@@ -191,8 +199,7 @@ public abstract class Neo4jProcessor {
 		Neo4jProcessor.LOG.debug("finished flushing and clearing index");
 	}
 
-	private void copyNFlushNClearLongIndex(final Long2LongOpenHashMap tempIndex, final ChronicleMap<Long, Long> persistentIndex,
-			final String indexName) {
+	private void copyNFlushNClearLongIndex(final HashLongLongMap tempIndex, final ChronicleMap<Long, Long> persistentIndex, final String indexName) {
 
 		Neo4jProcessor.LOG.debug("start pumping '" + indexName + "' index of size '" + tempIndex.size() + "'");
 
@@ -209,17 +216,17 @@ public abstract class Neo4jProcessor {
 		int sinceLast = 0;
 
 		// for (int i = 0; i < states.length; i++) {
-		final Long2LongMap.FastEntrySet entrySet = tempIndex.long2LongEntrySet();
-		final ObjectIterator<Long2LongMap.Entry> iter = entrySet.fastIterator();
+		final HashObjSet<Map.Entry<Long, Long>> entrySet = tempIndex.entrySet();
+		final ObjCursor<Map.Entry<Long, Long>> iter = entrySet.cursor();
 
-		while (iter.hasNext()) {
+		while (iter.moveNext()) {
 
-			final Long2LongMap.Entry entry = iter.next();
+			final Map.Entry<Long, Long> entry = iter.elem();
 
 			// if (states[i]) {
 
 			// persistentIndex.add(values[i], MapUtil.map(indexProperty, keys[i]));
-			persistentIndex.acquireUsing(entry.getLongKey(), entry.getLongValue());
+			persistentIndex.acquireUsing(entry.getKey(), entry.getValue());
 
 			j++;
 
@@ -697,7 +704,7 @@ public abstract class Neo4jProcessor {
 		return properties.get(key);
 	}
 
-	private Optional<Long> getIdFromIndex(final String key, final Object2LongOpenHashMap<String> tempIndex, final BatchInserterIndex index,
+	private Optional<Long> getIdFromIndex(final String key, final HashObjLongMap<String> tempIndex, final BatchInserterIndex index,
 			final String indexProperty) {
 
 		if (key == null) {
