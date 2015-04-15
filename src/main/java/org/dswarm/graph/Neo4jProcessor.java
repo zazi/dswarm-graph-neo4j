@@ -189,6 +189,8 @@ public abstract class Neo4jProcessor {
 		tempResourcesWDataModelIndex.clear();
 		tempResourceTypesIndex.clear();
 
+		LOG.debug("start clearing and closing mapdb indices");
+
 		if (!tempStatementHashesDB.isClosed()) {
 
 			tempStatementHashes.clear();
@@ -205,15 +207,19 @@ public abstract class Neo4jProcessor {
 
 			statementHashesDB.close();
 		}
+
+		LOG.debug("finished clearing and closing mapdb indices");
 	}
 
 	public void beginTx() throws DMPGraphException {
+
+		Neo4jProcessor.LOG.debug("beginning new tx");
 
 		tx = database.beginTx();
 		initIndices();
 		txIsClosed = false;
 
-		Neo4jProcessor.LOG.debug("begin new tx");
+		Neo4jProcessor.LOG.debug("new tx is ready");
 	}
 
 	public void renewTx() throws DMPGraphException {
@@ -224,7 +230,7 @@ public abstract class Neo4jProcessor {
 
 	public void failTx() {
 
-		Neo4jProcessor.LOG.error("tx failed; close tx");
+		Neo4jProcessor.LOG.error("tx failed; closing tx");
 
 		tempStatementHashesDB.close();
 		inMemoryStatementHashesDB.close();
@@ -232,16 +238,20 @@ public abstract class Neo4jProcessor {
 		tx.failure();
 		tx.close();
 		txIsClosed = true;
+
+		Neo4jProcessor.LOG.error("tx failed; closed tx");
 	}
 
 	public void succeedTx() {
 
-		Neo4jProcessor.LOG.debug("tx succeeded; close tx");
+		Neo4jProcessor.LOG.debug("tx succeeded; closing tx");
 
 		pumpNFlushStatementIndex();
 		tx.success();
 		tx.close();
 		txIsClosed = true;
+
+		Neo4jProcessor.LOG.debug("tx succeeded; closed tx");
 	}
 
 	public void ensureRunningTx() throws DMPGraphException {
