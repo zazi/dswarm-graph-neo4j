@@ -14,14 +14,6 @@
  * You should have received a copy of the GNU General Public License
  * along with d:swarm graph extension.  If not, see <http://www.gnu.org/licenses/>.
  */
-/**
- * This file is part of d:swarm graph extension. d:swarm graph extension is free software: you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by the Free Software Foundation, either version 3 of the
- * License, or (at your option) any later version. d:swarm graph extension is distributed in the hope that it will be useful, but
- * WITHOUT ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the GNU
- * General Public License for more details. You should have received a copy of the GNU General Public License along with d:swarm
- * graph extension. If not, see <http://www.gnu.org/licenses/>.
- */
 package org.dswarm.graph;
 
 import java.io.File;
@@ -163,14 +155,14 @@ public abstract class Neo4jProcessor {
 		return database;
 	}
 
-	public Map<String, Node> getBNodesIndex() {
+	public void addNodeToBNodesIndex(final String key, final Node bnode) {
 
-		return bnodes;
+		bnodes.put(key, bnode);
 	}
 
-	public Index<Node> getValueIndex() {
+	public void addNodeToValueIndex(final Node literal, final String key, final String value) {
 
-		return values;
+		values.add(literal, key, value);
 	}
 
 	public void addHashToStatementIndex(final long hash) {
@@ -384,28 +376,9 @@ public abstract class Neo4jProcessor {
 		// 1. check temp statement hashes
 		// 2. check in-memory statement hashes
 		// 3. check persistent statement hashes
-
-		if(tempStatementHashes == null && inMemoryStatementHashes == null && statementHashes == null) {
-
-			return false;
-		}
-
-		if(tempStatementHashes != null && tempStatementHashes.contains(hash)) {
-
-			return true;
-		}
-
-		if(inMemoryStatementHashes != null && inMemoryStatementHashes.contains(hash)) {
-
-			return true;
-		}
-
-		if(statementHashes != null && statementHashes.contains(hash)) {
-
-			return true;
-		}
-
-		return false;
+		return !(tempStatementHashes == null && inMemoryStatementHashes == null && statementHashes == null) && (
+				tempStatementHashes != null && tempStatementHashes.contains(hash) || inMemoryStatementHashes != null && inMemoryStatementHashes
+						.contains(hash) || statementHashes != null && statementHashes.contains(hash));
 	}
 
 	public Relationship prepareRelationship(final Node subjectNode, final String predicateURI, final Node objectNode, final String statementUUID,
@@ -464,8 +437,9 @@ public abstract class Neo4jProcessor {
 		final Optional<NodeType> optionalObjectNodeType = statement.getOptionalObjectNodeType();
 		final Optional<String> optionalSubjectIdentifier = getIdentifier(subjectNode, optionalSubjectNodeType);
 		final Optional<String> optionalObjectIdentifier = statement.getOptionalObjectValue();
+		final String predicateName = statement.getOptionalPredicateURI().get();
 
-		return generateStatementHash(statement.getOptionalPredicateURI().get(), optionalSubjectNodeType, optionalObjectNodeType,
+		return generateStatementHash(predicateName, optionalSubjectNodeType, optionalObjectNodeType,
 				optionalSubjectIdentifier,
 				optionalObjectIdentifier);
 	}
@@ -484,8 +458,8 @@ public abstract class Neo4jProcessor {
 			throw new DMPGraphException(message);
 		}
 
-		final String simpleHashString = optionalSubjectNodeType.toString() + ":" + optionalSubjectIdentifier.get() + " " + predicateName + " "
-				+ optionalObjectNodeType.toString() + ":" + optionalObjectIdentifier.get();
+		final String simpleHashString = optionalSubjectNodeType.get().toString() + ":" + optionalSubjectIdentifier.get() + " " + predicateName + " "
+				+ optionalObjectNodeType.get().toString() + ":" + optionalObjectIdentifier.get();
 
 		final String hashString = putSaltToStatementHash(simpleHashString);
 

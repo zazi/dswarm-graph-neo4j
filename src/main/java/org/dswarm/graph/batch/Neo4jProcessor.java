@@ -486,7 +486,8 @@ public abstract class Neo4jProcessor {
 
 	public boolean checkStatementExists(final long hash) throws DMPGraphException {
 
-		return checkLongIndex(hash, statementHashes);
+		return checkLongIndex(hash, tempStatementHashes) || checkLongIndex(hash, statementHashes);
+
 	}
 
 	public Map<String, Object> prepareRelationship(final String statementUUID, final Optional<Map<String, Object>> optionalQualifiedAttributes) {
@@ -563,8 +564,8 @@ public abstract class Neo4jProcessor {
 			throw new DMPGraphException(message);
 		}
 
-		final String simpleHashString = optionalSubjectNodeType.toString() + ":" + optionalSubjectIdentifier.get() + " " + predicateName + " "
-				+ optionalObjectNodeType.toString() + ":" + optionalObjectIdentifier.get();
+		final String simpleHashString = optionalSubjectNodeType.get().toString() + ":" + optionalSubjectIdentifier.get() + " " + predicateName + " "
+				+ optionalObjectNodeType.get().toString() + ":" + optionalObjectIdentifier.get();
 
 		final String hashString = putSaltToStatementHash(simpleHashString);
 

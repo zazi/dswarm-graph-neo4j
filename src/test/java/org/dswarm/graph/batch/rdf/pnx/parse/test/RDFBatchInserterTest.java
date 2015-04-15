@@ -19,9 +19,6 @@ package org.dswarm.graph.batch.rdf.pnx.parse.test;
 import java.io.ByteArrayInputStream;
 import java.io.InputStream;
 import java.net.URL;
-import java.nio.file.Files;
-import java.nio.file.Path;
-import java.nio.file.Paths;
 import java.util.HashMap;
 import java.util.Iterator;
 import java.util.Map;
@@ -33,7 +30,6 @@ import org.dswarm.graph.batch.rdf.pnx.parse.PNXParser;
 import org.dswarm.graph.batch.rdf.pnx.parse.RDFHandler;
 import org.dswarm.graph.batch.rdf.pnx.parse.RDFParser;
 import org.junit.Test;
-import org.neo4j.helpers.collection.MapUtil;
 import org.neo4j.unsafe.batchinsert.BatchInserter;
 import org.neo4j.unsafe.batchinsert.BatchInserters;
 import org.slf4j.Logger;
@@ -58,13 +54,8 @@ public class RDFBatchInserterTest {
 
 		final String dataModelURI = "test";
 
-		//final Map<String, String> config = new HashMap<>();
-		final Path path = Paths.get("/var/lib/neo4j/conf/neo4j.properties");
-		final InputStream input = Files.newInputStream(path);
-		final Map<String, String> config = MapUtil.load(input);
-
+		final Map<String, String> config = new HashMap<>();
 		config.put("cache_type", "none");
-		//config.put("use_memory_mapped_buffers", "true");
 		final BatchInserter inserter = BatchInserters.inserter("target/test_data", config);
 
 		final RDFNeo4jProcessor processor = new DataModelRDFNeo4jProcessor(inserter, dataModelURI);
@@ -75,12 +66,10 @@ public class RDFBatchInserterTest {
 
 		LOG.debug("start batch import");
 
-		//final URL fileURL = Resources.getResource("dmpf_bsp1.nt");
-		//final byte[] file = Resources.toByteArray(fileURL);
-		//final InputStream stream = new ByteArrayInputStream(file);
-		//final String modelPath = "/home/tgaengler/projects/slub/efre/sprints/sprint33/GND.nt";
-		final String modelPath ="/home/tgaengler/git/dmp-graph/dmp-graph/src/test/resources/dmpf_bsp1.nt";
-		final Iterator<Statement> model = NonStrictNtParser.parse(modelPath);
+		final URL fileURL = Resources.getResource("dmpf_bsp1.nt");
+		final byte[] file = Resources.toByteArray(fileURL);
+		final InputStream stream = new ByteArrayInputStream(file);
+		final Iterator<Statement> model = NonStrictNtParser.parse(stream);
 
 		LOG.debug("finished loading RDF model");
 
@@ -89,12 +78,14 @@ public class RDFBatchInserterTest {
 		// flush indices etc.
 		handler.getHandler().closeTransaction();
 
-		LOG.debug("finished writing " + handler.getHandler().getCountedStatements() + " RDF statements ('"
-				+ handler.getHandler().getRelationshipsAdded() + "' added relationships) into graph db for data model URI '" + dataModelURI
-				+ "'");
+		LOG.debug(
+				"finished writing {} RDF statements (added {} relationships, added {} nodes (resources + bnodes + literals), added {} literals) into graph db for data model URI '{}'",
+				handler.getHandler().getCountedStatements(),
+				handler.getHandler().getRelationshipsAdded(), handler.getHandler().getNodesAdded(), handler.getHandler().getCountedLiterals(),
+				dataModelURI);
 		NonStrictNtParser.close();
 
-		//stream.close();
+		stream.close();
 		inserter.shutdown();
 
 		LOG.debug("shutdown batch inserter");

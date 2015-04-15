@@ -14,14 +14,6 @@
  * You should have received a copy of the GNU General Public License
  * along with d:swarm graph extension.  If not, see <http://www.gnu.org/licenses/>.
  */
-/**
- * This file is part of d:swarm graph extension. d:swarm graph extension is free software: you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by the Free Software Foundation, either version 3 of the
- * License, or (at your option) any later version. d:swarm graph extension is distributed in the hope that it will be useful, but
- * WITHOUT ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the GNU
- * General Public License for more details. You should have received a copy of the GNU General Public License along with d:swarm
- * graph extension. If not, see <http://www.gnu.org/licenses/>.
- */
 package org.dswarm.graph.parse;
 
 import java.util.Map;
@@ -52,22 +44,24 @@ import com.hp.hpl.jena.vocabulary.RDFS;
 public abstract class BaseNeo4jHandler implements Neo4jHandler, Neo4jUpdateHandler {
 
 	private static final Logger		LOG					= LoggerFactory.getLogger(BaseNeo4jHandler.class);
+	private static final int TX_CHUNK_SIZE = 50000;
+	private static final int TX_TIME_DELTA = 30;
 
-	protected int					totalTriples		= 0;
-	protected int					addedNodes			= 0;
-	protected int					addedRelationships	= 0;
-	protected int					sinceLastCommit		= 0;
-	protected int					i					= 0;
-	protected int					literals			= 0;
+	protected int totalTriples       = 0;
+	protected int addedNodes         = 0;
+	protected int addedRelationships = 0;
+	protected int sinceLastCommit    = 0;
+	protected int i                  = 0;
+	protected int literals           = 0;
 
-	protected long					tick				= System.currentTimeMillis();
+	protected long tick = System.currentTimeMillis();
 
-	protected String				resourceUri;
+	protected String resourceUri;
 
 	// TODO: init
-	protected VersionHandler		versionHandler		= null;
+	protected VersionHandler versionHandler = null;
 
-	protected final Neo4jProcessor	processor;
+	protected final Neo4jProcessor processor;
 
 	public BaseNeo4jHandler(final Neo4jProcessor processorArg) throws DMPGraphException {
 
@@ -150,7 +144,7 @@ public abstract class BaseNeo4jHandler implements Neo4jHandler, Neo4jUpdateHandl
 					// subject is a blank node
 
 					// note: can I expect an id here?
-					processor.getBNodesIndex().put(statement.getOptionalSubjectId().get(), subjectNode);
+					processor.addNodeToBNodesIndex(statement.getOptionalSubjectId().get(), subjectNode);
 					subjectNode.setProperty(GraphStatics.NODETYPE_PROPERTY, NodeType.BNode.toString());
 				}
 
@@ -279,13 +273,15 @@ public abstract class BaseNeo4jHandler implements Neo4jHandler, Neo4jUpdateHandl
 			final long nodeDelta = totalTriples - sinceLastCommit;
 			final long timeDelta = (System.currentTimeMillis() - tick) / 1000;
 
-			if (nodeDelta >= 50000 || timeDelta >= 30) { // Commit every 50k operations or every 30 seconds
+			if (nodeDelta >= TX_CHUNK_SIZE || timeDelta >= TX_TIME_DELTA) { // Commit every 50k operations or every 30 seconds
 
 				processor.renewTx();
 
 				sinceLastCommit = totalTriples;
 
-				LOG.debug(totalTriples + " triples @ ~" + (double) nodeDelta / timeDelta + " triples/second.");
+				final double duration = (double) nodeDelta / timeDelta;
+
+				LOG.debug("{} triples @ ~{} triples/second.", totalTriples, duration);
 
 				tick = System.currentTimeMillis();
 			}
@@ -347,6 +343,7 @@ public abstract class BaseNeo4jHandler implements Neo4jHandler, Neo4jUpdateHandl
 		return totalTriples;
 	}
 
+	@Override
 	public int getNodesAdded() {
 
 		return addedNodes;
@@ -358,6 +355,7 @@ public abstract class BaseNeo4jHandler implements Neo4jHandler, Neo4jUpdateHandl
 		return addedRelationships;
 	}
 
+	@Override
 	public int getCountedLiterals() {
 
 		return literals;
@@ -378,7 +376,7 @@ public abstract class BaseNeo4jHandler implements Neo4jHandler, Neo4jUpdateHandl
 		final Optional<String> optionalResourceUri;
 		// object is a blank node
 
-		processor.getBNodesIndex().put(statement.getOptionalObjectId().get(), objectNode);
+		processor.addNodeToBNodesIndex(statement.getOptionalObjectId().get(), objectNode);
 
 		final NodeType objectNodeType = optionalObjectNodeType.get();
 		objectNode.setProperty(GraphStatics.NODETYPE_PROPERTY, objectNodeType.toString());
@@ -409,7 +407,7 @@ public abstract class BaseNeo4jHandler implements Neo4jHandler, Neo4jUpdateHandl
 			final Node objectNode = processor.getDatabase().createNode();
 			objectNode.setProperty(GraphStatics.VALUE_PROPERTY, statement.getOptionalObjectValue().get());
 			objectNode.setProperty(GraphStatics.NODETYPE_PROPERTY, NodeType.Literal.toString());
-			processor.getValueIndex().add(objectNode, GraphStatics.VALUE, statement.getOptionalObjectValue().get());
+			processor.addNodeToValueIndex(objectNode, GraphStatics.VALUE, statement.getOptionalObjectValue().get());
 
 			final Optional<String> optionalResourceUri = addResourceProperty(subjectNode, objectNode, statement.getOptionalSubjectNodeType(),
 					statement.getOptionalSubjectURI(), statement.getOptionalResourceURI());
@@ -513,7 +511,7 @@ public abstract class BaseNeo4jHandler implements Neo4jHandler, Neo4jUpdateHandl
 
 			case BNode:
 
-				processor.getBNodesIndex().put(optionalNodeId.get(), node);
+				processor.addNodeToBNodesIndex(optionalNodeId.get(), node);
 
 				break;
 		}

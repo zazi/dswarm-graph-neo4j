@@ -276,7 +276,10 @@ public class RDFResource {
 			in.close();
 			inputStream.close();
 
-			RDFResource.LOG.debug("finished writing {} RDF statements into graph db", handler.getHandler().getCountedStatements());
+			LOG.debug(
+					"finished writing {} RDF statements (added {} relationships, added {} nodes (resources + bnodes), added {} literals) into graph db",
+					handler.getHandler().getCountedStatements(),
+					handler.getHandler().getRelationshipsAdded(), handler.getHandler().getNodesAdded(), handler.getHandler().getCountedLiterals());
 		} catch (final Exception e) {
 
 			processor.getProcessor().failTx();
@@ -324,8 +327,11 @@ public class RDFResource {
 			handler.getHandler().closeTransaction();
 			rdfInputStream.close();
 
-			LOG.debug("finished writing " + handler.getHandler().getCountedStatements()
-					+ " RDF statements into graph db for data model URI '" + dataModelURI + "'");
+			LOG.debug(
+					"finished writing {} RDF statements (added {} relationships, added {} nodes (resources + bnodes + literals), added {} literals) into graph db for data model URI '{}'",
+					handler.getHandler().getCountedStatements(),
+					handler.getHandler().getRelationshipsAdded(), handler.getHandler().getNodesAdded(), handler.getHandler().getCountedLiterals(),
+					dataModelURI);
 		} catch (final Exception e) {
 
 			processor.getProcessor().failTx();
@@ -418,7 +424,10 @@ public class RDFResource {
 			in.close();
 			rdfInputStream.close();
 
-			LOG.debug("finished writing {} RDF statements into graph db for data model URI '{}'", handler.getHandler().getCountedStatements(),
+			LOG.debug(
+					"finished writing {} RDF statements (added {} relationships, added {} nodes (resources + bnodes), added {} literals) into graph db for data model URI '{}'",
+					handler.getHandler().getCountedStatements(),
+					handler.getHandler().getRelationshipsAdded(), handler.getHandler().getNodesAdded(), handler.getHandler().getCountedLiterals(),
 					dataModelURI);
 		} catch (final Exception e) {
 
