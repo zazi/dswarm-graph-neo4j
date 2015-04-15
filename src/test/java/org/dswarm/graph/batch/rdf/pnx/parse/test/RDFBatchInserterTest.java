@@ -58,8 +58,13 @@ public class RDFBatchInserterTest {
 
 		final String dataModelURI = "test";
 
-		final Map<String, String> config = new HashMap<>();
+		//final Map<String, String> config = new HashMap<>();
+		final Path path = Paths.get("/var/lib/neo4j/conf/neo4j.properties");
+		final InputStream input = Files.newInputStream(path);
+		final Map<String, String> config = MapUtil.load(input);
+
 		config.put("cache_type", "none");
+		//config.put("use_memory_mapped_buffers", "true");
 		final BatchInserter inserter = BatchInserters.inserter("target/test_data", config);
 
 		final RDFNeo4jProcessor processor = new DataModelRDFNeo4jProcessor(inserter, dataModelURI);
@@ -70,10 +75,12 @@ public class RDFBatchInserterTest {
 
 		LOG.debug("start batch import");
 
-		final URL fileURL = Resources.getResource("dmpf_bsp1.nt");
-		final byte[] file = Resources.toByteArray(fileURL);
-		final InputStream stream = new ByteArrayInputStream(file);
-		final Iterator<Statement> model = NonStrictNtParser.parse(stream);
+		//final URL fileURL = Resources.getResource("dmpf_bsp1.nt");
+		//final byte[] file = Resources.toByteArray(fileURL);
+		//final InputStream stream = new ByteArrayInputStream(file);
+		//final String modelPath = "/home/tgaengler/projects/slub/efre/sprints/sprint33/GND.nt";
+		final String modelPath ="/home/tgaengler/git/dmp-graph/dmp-graph/src/test/resources/dmpf_bsp1.nt";
+		final Iterator<Statement> model = NonStrictNtParser.parse(modelPath);
 
 		LOG.debug("finished loading RDF model");
 
@@ -87,7 +94,7 @@ public class RDFBatchInserterTest {
 				+ "'");
 		NonStrictNtParser.close();
 
-		stream.close();
+		//stream.close();
 		inserter.shutdown();
 
 		LOG.debug("shutdown batch inserter");

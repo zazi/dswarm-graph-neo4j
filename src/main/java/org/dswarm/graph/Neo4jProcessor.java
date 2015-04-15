@@ -75,17 +75,21 @@ public abstract class Neo4jProcessor {
 	protected final Map<String, Node>    bnodes;
 
 	// protected Index<Relationship> statementHashes;
-	private Set<Long> statementHashes;
-	private DB        statementHashesDB;
+	final private Set<Long> statementHashes;
+	final private DB        statementHashesDB;
 
-	protected  Set<Long> tempStatementHashes;
-	protected DB        tempStatementHashesDB;
+	final private Set<Long> tempStatementHashes;
+	final private DB        tempStatementHashesDB;
+
+	final private Set<Long> inMemoryStatementHashes;
+	final private DB        inMemoryStatementHashesDB;
 
 	protected final LongObjectMap<String> nodeResourceMap;
 
-	private Map<String, Node> tempResourcesIndex;
-	private Map<String, Node> tempResourcesWDataModelIndex;
-	private Map<String, Node> tempResourceTypesIndex;
+	// TODO: go offheap, if maps get to big
+	final private Map<String, Node> tempResourcesIndex;
+	final private Map<String, Node> tempResourcesWDataModelIndex;
+	final private Map<String, Node> tempResourceTypesIndex;
 
 	protected Transaction tx;
 
@@ -100,6 +104,9 @@ public abstract class Neo4jProcessor {
 
 		bnodes = new HashMap<>();
 		nodeResourceMap = new LongObjectOpenHashMap<>();
+		tempResourcesIndex = Maps.newHashMap();
+		tempResourcesWDataModelIndex = Maps.newHashMap();
+		tempResourceTypesIndex = Maps.newHashMap();
 
 		try {
 
@@ -108,9 +115,14 @@ public abstract class Neo4jProcessor {
 			tempStatementHashes = mapDBTuple.v1();
 			tempStatementHashesDB = mapDBTuple.v2();
 
-			final Tuple<Set<Long>, DB> mapDBTuple2 = getOrCreateLongIndex(GraphIndexStatics.STATEMENT_HASHES_INDEX_NAME);
-			statementHashes = mapDBTuple2.v1();
-			statementHashesDB = mapDBTuple2.v2();
+			final Tuple<Set<Long>, DB> mapDBTuple2 = MapDBUtils
+					.createOrGetInMemoryLongIndexTreeSetNonTransactional(GraphIndexStatics.IN_MEMORY_STATEMENT_HASHES_INDEX_NAME);
+			inMemoryStatementHashes = mapDBTuple2.v1();
+			inMemoryStatementHashesDB = mapDBTuple2.v2();
+
+			final Tuple<Set<Long>, DB> mapDBTuple3 = getOrCreateLongIndex(GraphIndexStatics.STATEMENT_HASHES_INDEX_NAME);
+			statementHashes = mapDBTuple3.v1();
+			statementHashesDB = mapDBTuple3.v2();
 		} catch (final IOException e) {
 
 			failTx();
@@ -129,11 +141,7 @@ public abstract class Neo4jProcessor {
 			values = database.index().forNodes(GraphIndexStatics.VALUES_INDEX_NAME);
 			// statementHashes = database.index().forRelationships(GraphIndexStatics.STATEMENT_HASHES_INDEX_NAME);
 
-			tempResourcesIndex = Maps.newHashMap();
-			tempResourcesWDataModelIndex = Maps.newHashMap();
-			tempResourceTypesIndex = Maps.newHashMap();
-
-			if(tempStatementHashes != null) {
+			if (tempStatementHashes != null) {
 
 				tempStatementHashes.clear();
 			}
@@ -170,11 +178,6 @@ public abstract class Neo4jProcessor {
 		tempStatementHashes.add(hash);
 	}
 
-	public LongObjectMap<String> getNodeResourceMap() {
-
-		return nodeResourceMap;
-	}
-
 	public abstract Index<Relationship> getStatementUUIDsIndex();
 
 	public void clearMaps() {
@@ -192,7 +195,13 @@ public abstract class Neo4jProcessor {
 			tempStatementHashesDB.close();
 		}
 
-		if(!statementHashesDB.isClosed()) {
+		if (!inMemoryStatementHashesDB.isClosed()) {
+
+			inMemoryStatementHashes.clear();
+			inMemoryStatementHashesDB.close();
+		}
+
+		if (!statementHashesDB.isClosed()) {
 
 			statementHashesDB.close();
 		}
@@ -218,6 +227,7 @@ public abstract class Neo4jProcessor {
 		Neo4jProcessor.LOG.error("tx failed; close tx");
 
 		tempStatementHashesDB.close();
+		inMemoryStatementHashesDB.close();
 		statementHashesDB.close();
 		tx.failure();
 		tx.close();
@@ -361,9 +371,31 @@ public abstract class Neo4jProcessor {
 
 	public boolean checkStatementExists(final long hash) throws DMPGraphException {
 
-		return !(statementHashes == null && tempStatementHashes == null) && (tempStatementHashes != null && tempStatementHashes.contains(hash)
-				|| statementHashes != null && statementHashes.contains(hash));
+		// 1. check temp statement hashes
+		// 2. check in-memory statement hashes
+		// 3. check persistent statement hashes
 
+		if(tempStatementHashes == null && inMemoryStatementHashes == null && statementHashes == null) {
+
+			return false;
+		}
+
+		if(tempStatementHashes != null && tempStatementHashes.contains(hash)) {
+
+			return true;
+		}
+
+		if(inMemoryStatementHashes != null && inMemoryStatementHashes.contains(hash)) {
+
+			return true;
+		}
+
+		if(statementHashes != null && statementHashes.contains(hash)) {
+
+			return true;
+		}
+
+		return false;
 	}
 
 	public Relationship prepareRelationship(final Node subjectNode, final String predicateURI, final Node objectNode, final String statementUUID,
@@ -604,12 +636,14 @@ public abstract class Neo4jProcessor {
 
 		for (final Long hash : tempStatementHashes) {
 
+			inMemoryStatementHashes.add(hash);
 			statementHashes.add(hash);
 		}
 
 		LOG.debug("finished pumping statement index");
 
 		tempStatementHashesDB.commit();
+		inMemoryStatementHashesDB.commit();
 		//tempStatementHashes.clear();
 		//tempStatementHashesDB.close();
 		statementHashesDB.commit();
