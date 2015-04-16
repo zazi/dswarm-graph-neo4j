@@ -64,6 +64,7 @@ public abstract class Neo4jProcessor {
 	private         Index<Node>          resourcesWDataModel;
 	private         Index<Node>          resourceTypes;
 	private         Index<Node>          values;
+	private Index<Relationship> statementUUIDs;
 	protected final Map<String, Node>    bnodes;
 
 	// protected Index<Relationship> statementHashes;
@@ -131,6 +132,7 @@ public abstract class Neo4jProcessor {
 			resourcesWDataModel = database.index().forNodes(GraphIndexStatics.RESOURCES_W_DATA_MODEL_INDEX_NAME);
 			resourceTypes = database.index().forNodes(GraphIndexStatics.RESOURCE_TYPES_INDEX_NAME);
 			values = database.index().forNodes(GraphIndexStatics.VALUES_INDEX_NAME);
+			statementUUIDs = database.index().forRelationships(GraphIndexStatics.STATEMENT_UUIDS_INDEX_NAME);
 			// statementHashes = database.index().forRelationships(GraphIndexStatics.STATEMENT_HASHES_INDEX_NAME);
 
 			if (tempStatementHashes != null) {
@@ -170,7 +172,10 @@ public abstract class Neo4jProcessor {
 		tempStatementHashes.add(hash);
 	}
 
-	public abstract Index<Relationship> getStatementUUIDsIndex();
+	public void addStatementToIndex(final Relationship rel, final String statementUUID) {
+
+		statementUUIDs.add(rel, GraphStatics.UUID, statementUUID);
+	}
 
 	public void clearMaps() {
 
@@ -519,8 +524,6 @@ public abstract class Neo4jProcessor {
 
 	public abstract void handleSubjectDataModel(final Node node, String URI, final Optional<String> optionalDataModelURI);
 
-	public abstract void addStatementToIndex(final Relationship rel, final String statementUUID);
-
 	public abstract Optional<Node> getResourceNodeHits(final String resourceURI);
 
 	public Optional<Node> getNodeFromResourcesIndex(final String key) {
@@ -536,6 +539,32 @@ public abstract class Neo4jProcessor {
 	public Optional<Node> getNodeFromResourcesWDataModelIndex(final String resourceUri, final String dataModelUri) {
 
 		return getNodeFromIndex(resourceUri + dataModelUri, tempResourcesWDataModelIndex, resourcesWDataModel, GraphStatics.URI_W_DATA_MODEL);
+	}
+
+	public Optional<Relationship> getRelationshipFromStatementIndex(final String uuid) {
+
+		if(statementUUIDs == null) {
+
+			return Optional.absent();
+		}
+
+		final IndexHits<Relationship> hits = statementUUIDs.get(GraphStatics.UUID, uuid);
+
+		if (hits != null && hits.hasNext()) {
+
+			final Relationship rel = hits.next();
+
+			hits.close();
+
+			return Optional.of(rel);
+		}
+
+		if (hits != null) {
+
+			hits.close();
+		}
+
+		return Optional.absent();
 	}
 
 	public void addNodeToResourcesIndex(final String value, final Node node) {
