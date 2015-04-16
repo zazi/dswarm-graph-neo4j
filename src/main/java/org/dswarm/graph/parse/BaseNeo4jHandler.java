@@ -410,7 +410,7 @@ public abstract class BaseNeo4jHandler implements Neo4jHandler, Neo4jUpdateHandl
 			final Node objectNode = processor.getDatabase().createNode();
 			objectNode.setProperty(GraphStatics.VALUE_PROPERTY, statement.getOptionalObjectValue().get());
 			objectNode.setProperty(GraphStatics.NODETYPE_PROPERTY, NodeType.Literal.toString());
-			processor.addNodeToValueIndex(objectNode, GraphStatics.VALUE, statement.getOptionalObjectValue().get());
+			processor.addNodeToValueIndex(objectNode, statement.getOptionalObjectValue().get());
 
 			final Optional<String> optionalResourceUri = addResourceProperty(subjectNode, objectNode, statement.getOptionalSubjectNodeType(),
 					statement.getOptionalSubjectURI(), statement.getOptionalResourceURI());

@@ -79,10 +79,19 @@ public abstract class Neo4jProcessor {
 
 	protected final LongObjectMap<String> nodeResourceMap;
 
+	// indices per TX
 	// TODO: go offheap, if maps get to big
 	final private Map<String, Node> tempResourcesIndex;
 	final private Map<String, Node> tempResourcesWDataModelIndex;
 	final private Map<String, Node> tempResourceTypesIndex;
+	final private Map<String, Relationship> tempStatementUUIDsIndex;
+	final private Map<Node, String> tempValuesIndex;
+
+	// indices per process (across TXs)
+	// TODO: go offheap, if maps get to big
+	final private Map<String, Node> inMemoryResourcesIndex;
+	final private Map<String, Node> inMemoryResourcesWDataModelIndex;
+	final private Map<String, Node> inMemoryResourceTypesIndex;
 
 	protected Transaction tx;
 
@@ -91,15 +100,23 @@ public abstract class Neo4jProcessor {
 	public Neo4jProcessor(final GraphDatabaseService database) throws DMPGraphException {
 
 		this.database = database;
+
+		tempResourcesIndex = Maps.newHashMap();
+		tempResourcesWDataModelIndex = Maps.newHashMap();
+		tempResourceTypesIndex = Maps.newHashMap();
+		tempStatementUUIDsIndex = Maps.newHashMap();
+		tempValuesIndex = Maps.newHashMap();
+
 		beginTx();
 
 		LOG.debug("start write TX");
 
 		bnodes = new HashMap<>();
 		nodeResourceMap = new LongObjectOpenHashMap<>();
-		tempResourcesIndex = Maps.newHashMap();
-		tempResourcesWDataModelIndex = Maps.newHashMap();
-		tempResourceTypesIndex = Maps.newHashMap();
+
+		inMemoryResourcesIndex = Maps.newHashMap();
+		inMemoryResourcesWDataModelIndex = Maps.newHashMap();
+		inMemoryResourceTypesIndex = Maps.newHashMap();
 
 		try {
 
@@ -135,6 +152,13 @@ public abstract class Neo4jProcessor {
 			statementUUIDs = database.index().forRelationships(GraphIndexStatics.STATEMENT_UUIDS_INDEX_NAME);
 			// statementHashes = database.index().forRelationships(GraphIndexStatics.STATEMENT_HASHES_INDEX_NAME);
 
+			// refresh temp TX indices
+			tempResourcesIndex.clear();
+			tempResourcesWDataModelIndex.clear();
+			tempResourceTypesIndex.clear();
+			tempStatementUUIDsIndex.clear();
+			tempValuesIndex.clear();
+
 			if (tempStatementHashes != null) {
 
 				tempStatementHashes.clear();
@@ -162,9 +186,9 @@ public abstract class Neo4jProcessor {
 		bnodes.put(key, bnode);
 	}
 
-	public void addNodeToValueIndex(final Node literal, final String key, final String value) {
+	public void addNodeToValueIndex(final Node literal, final String value) {
 
-		values.add(literal, key, value);
+		tempValuesIndex.put(literal, value);
 	}
 
 	public void addHashToStatementIndex(final long hash) {
@@ -174,7 +198,7 @@ public abstract class Neo4jProcessor {
 
 	public void addStatementToIndex(final Relationship rel, final String statementUUID) {
 
-		statementUUIDs.add(rel, GraphStatics.UUID, statementUUID);
+		tempStatementUUIDsIndex.put(statementUUID, rel);
 	}
 
 	public void clearMaps() {
@@ -185,6 +209,12 @@ public abstract class Neo4jProcessor {
 		tempResourcesIndex.clear();
 		tempResourcesWDataModelIndex.clear();
 		tempResourceTypesIndex.clear();
+		tempStatementUUIDsIndex.clear();
+		tempValuesIndex.clear();
+
+		inMemoryResourcesIndex.clear();
+		inMemoryResourcesWDataModelIndex.clear();
+		inMemoryResourceTypesIndex.clear();
 
 		LOG.debug("start clearing and closing mapdb indices");
 
@@ -243,7 +273,12 @@ public abstract class Neo4jProcessor {
 
 		Neo4jProcessor.LOG.debug("tx succeeded; closing tx");
 
-		pumpNFlushStatementIndex();
+		Neo4jProcessor.LOG.debug("start index pump'n'flushing");
+
+		pumpNFlushIndices();
+
+		Neo4jProcessor.LOG.debug("finished index pump'n'flushing");
+
 		tx.success();
 		tx.close();
 		txIsClosed = true;
@@ -528,17 +563,18 @@ public abstract class Neo4jProcessor {
 
 	public Optional<Node> getNodeFromResourcesIndex(final String key) {
 
-		return getNodeFromIndex(key, tempResourcesIndex, resources, GraphStatics.URI);
+		return getNodeFromIndex(key, tempResourcesIndex, inMemoryResourcesIndex, resources, GraphStatics.URI);
 	}
 
 	public Optional<Node> getNodeFromResourceTypesIndex(final String key) {
 
-		return getNodeFromIndex(key, tempResourceTypesIndex, resourceTypes, GraphStatics.URI);
+		return getNodeFromIndex(key, tempResourceTypesIndex, inMemoryResourceTypesIndex, resourceTypes, GraphStatics.URI);
 	}
 
 	public Optional<Node> getNodeFromResourcesWDataModelIndex(final String resourceUri, final String dataModelUri) {
 
-		return getNodeFromIndex(resourceUri + dataModelUri, tempResourcesWDataModelIndex, resourcesWDataModel, GraphStatics.URI_W_DATA_MODEL);
+		return getNodeFromIndex(resourceUri + dataModelUri, tempResourcesWDataModelIndex, inMemoryResourcesWDataModelIndex, resourcesWDataModel,
+				GraphStatics.URI_W_DATA_MODEL);
 	}
 
 	public Optional<Relationship> getRelationshipFromStatementIndex(final String uuid) {
@@ -569,29 +605,37 @@ public abstract class Neo4jProcessor {
 
 	public void addNodeToResourcesIndex(final String value, final Node node) {
 
-		addNodeToIndex(GraphStatics.URI, value, node, tempResourcesIndex, resources);
+		//addNodeToIndex(GraphStatics.URI, value, node, tempResourcesIndex, resources);
+		addNodeToIndex(value, node, tempResourcesIndex);
 	}
 
 	public void addNodeToResourcesWDataModelIndex(final String resourceUri, final String dataModelUri, final Node node) {
 
-		addNodeToIndex(GraphStatics.URI_W_DATA_MODEL, resourceUri + dataModelUri, node, tempResourcesWDataModelIndex, resourcesWDataModel);
+		//addNodeToIndex(GraphStatics.URI_W_DATA_MODEL, resourceUri + dataModelUri, node, tempResourcesWDataModelIndex, resourcesWDataModel);
+		addNodeToIndex(resourceUri + dataModelUri, node, tempResourcesWDataModelIndex);
 		addNodeToResourcesIndex(resourceUri, node);
 	}
 
 	public void addNodeToResourceTypesIndex(final String key, final Node node) {
 
-		addNodeToIndex(GraphStatics.URI, key, node, tempResourceTypesIndex, resourceTypes);
+		//addNodeToIndex(GraphStatics.URI, key, node, tempResourceTypesIndex, resourceTypes);
+		addNodeToIndex(key, node, tempResourceTypesIndex);
 		addNodeToResourcesIndex(key, node);
 	}
 
 	protected abstract String putSaltToStatementHash(final String hash);
 
-	protected Optional<Node> getNodeFromIndex(final String key, final Map<String, Node> tempIndex, final Index<Node> index,
+	protected Optional<Node> getNodeFromIndex(final String key, final Map<String, Node> tempIndex, final Map<String, Node> inMemoryIndex, final Index<Node> index,
 			final String indexProperty) {
 
 		if (tempIndex.containsKey(key)) {
 
 			return Optional.of(tempIndex.get(key));
+		}
+
+		if (inMemoryIndex.containsKey(key)) {
+
+			return Optional.of(inMemoryIndex.get(key));
 		}
 
 		if (index == null) {
@@ -611,8 +655,8 @@ public abstract class Neo4jProcessor {
 
 			if (optionalHit.isPresent()) {
 
-				// temp cache index hits again
-				tempIndex.put(key, optionalHit.get());
+				// in-memory cache index hits again
+				inMemoryIndex.put(key, optionalHit.get());
 			}
 
 			return optionalHit;
@@ -634,13 +678,56 @@ public abstract class Neo4jProcessor {
 		return MapDBUtils.createOrGetPersistentLongIndexTreeSetGlobalTransactional(storeDir + File.separator + name, name);
 	}
 
-	private void addNodeToIndex(final String indexProperty, final String key, final Node node, final Map<String, Node> tempIndex,
-			final Index<Node> index) {
+	private void addNodeToIndex(final String key, final Node node, final Map<String, Node> tempIndex) {
 
 		tempIndex.put(key, node);
 
 		// TODO: we probably shall do this at the end of the transaction, or?
-		index.add(node, indexProperty, key);
+		//index.add(node, indexProperty, key);
+	}
+
+	private void pumpNFlushIndices() {
+
+		pumpNFlushNodeIndex(tempResourcesIndex, inMemoryResourcesIndex, resources, GraphStatics.URI);
+		pumpNFlushNodeIndex(tempResourcesWDataModelIndex, inMemoryResourcesWDataModelIndex, resourcesWDataModel, GraphStatics.URI_W_DATA_MODEL);
+		pumpNFlushNodeIndex(tempResourceTypesIndex, inMemoryResourceTypesIndex, resourceTypes, GraphStatics.URI);
+		pumpNFlushRelationshipIndex(tempStatementUUIDsIndex, statementUUIDs, GraphStatics.UUID);
+		pumpNFlushNodeIndex(tempValuesIndex, values, GraphStatics.VALUE);
+		pumpNFlushStatementIndex();
+	}
+
+	private void pumpNFlushNodeIndex(final Map<String, Node> tempIndex, final Map<String, Node> inMemoryIndex, final Index<Node> index, final String indexProperty) {
+
+		for(final Map.Entry<String, Node> entry : tempIndex.entrySet()) {
+
+			final String key = entry.getKey();
+			final Node node = entry.getValue();
+
+			inMemoryIndex.put(key, node);
+			index.add(node, indexProperty, key);
+		}
+	}
+
+	private void pumpNFlushNodeIndex(final Map<Node, String> tempIndex, final Index<Node> index, final String indexProperty) {
+
+		for(final Map.Entry<Node, String> entry : tempIndex.entrySet()) {
+
+			final Node node = entry.getKey();
+			final String value = entry.getValue();
+
+			index.add(node, indexProperty, value);
+		}
+	}
+
+	private void pumpNFlushRelationshipIndex(final Map<String, Relationship> tempIndex, final Index<Relationship> index, final String indexProperty) {
+
+		for(final Map.Entry<String, Relationship> entry : tempIndex.entrySet()) {
+
+			final String key = entry.getKey();
+			final Relationship rel = entry.getValue();
+
+			index.add(rel, indexProperty, key);
+		}
 	}
 
 	private void pumpNFlushStatementIndex() {
