@@ -21,6 +21,7 @@ import java.io.IOException;
 import java.util.Map;
 import java.util.Set;
 
+import org.mapdb.BTreeKeySerializer;
 import org.mapdb.DB;
 import org.mapdb.DBMaker;
 import org.mapdb.Serializer;
@@ -65,6 +66,20 @@ public final class MapDBUtils {
 		final DB db = createNonTransactionalInMemoryMapDB();
 
 		return Tuple.tuple(createTreeSet(db, indexName), db);
+	}
+
+	public static Tuple<Map<String, String>, DB> createOrGetInMemoryStringStringIndexTreeMapNonTransactional(final String indexName) {
+
+		final DB db = createNonTransactionalInMemoryMapDB();
+
+		return Tuple.tuple(createStringStringTreeMap(db, indexName), db);
+	}
+
+	public static Tuple<Map<String, String>, DB> createOrGetInMemoryStringStringIndexTreeMapGlobalTransactional(final String indexName) {
+
+		final DB db = createGlobalTransactionalInMemoryMapDB();
+
+		return Tuple.tuple(createStringStringTreeMap(db, indexName), db);
 	}
 
 	public static Tuple<Set<Long>, DB> getOrCreateInMemoryLongIndexTreeSetNonTransactional(final String name) {
@@ -156,6 +171,18 @@ public final class MapDBUtils {
 		return MapDBUtils.createOrGetPersistentLongLongIndexHashMapGlobalTransactional(Statics.DEFAULT_STORE_DIR + File.separator + name);
 	}
 
+	public static Tuple<Map<String, String>, DB> createOrGetPersistentStringStringIndexTreeMapGlobalTransactional(final String indexFileName, final String indexName) {
+
+		final DB db = createGlobalTransactionalPermanentMapDB(indexFileName);
+
+		return Tuple.tuple(createStringStringTreeMap(db, indexName), db);
+	}
+
+	public static Tuple<Map<String, String>, DB> getOrCreateStringStringndexTreeMapGlobalTransactional(final String name) {
+
+		return MapDBUtils.createOrGetPersistentStringStringIndexTreeMapGlobalTransactional(Statics.DEFAULT_STORE_DIR + File.separator + name, name);
+	}
+
 	public static Tuple<Set<Long>, DB> createOrGetPersistentLongIndexHashSetGlobalTransactional(final String indexFileName) {
 
 		final DB db = createGlobalTransactionalPermanentMapDB(indexFileName);
@@ -173,6 +200,13 @@ public final class MapDBUtils {
 		return db.createTreeMap(indexFileName)
 				//.keySerializer(BTreeKeySerializer.LONG) // supported by 2.0-alpha1
 				.valueSerializer(Serializer.LONG).makeOrGet();
+	}
+
+	public static Map<String, String> createStringStringTreeMap(final DB db, final String indexFileName) {
+
+		return db.createTreeMap(indexFileName)
+				.keySerializer(BTreeKeySerializer.STRING)
+				.valueSerializer(Serializer.STRING).makeOrGet();
 	}
 
 	public static Set<Long> createTreeSet(final DB db, final String indexFileName) {
